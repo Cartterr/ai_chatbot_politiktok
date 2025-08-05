@@ -124,24 +124,32 @@ const EtymologicalFamiliesViz = () => {
     const minRadius = 15;
     const maxRadius = 60;
     
+    // Handle case where all frequencies are the same
+    if (maxFreq === minFreq || maxFreq - minFreq === 0) {
+      return (minRadius + maxRadius) / 2; // Return middle size
+    }
+    
     switch (scalingMethod) {
       case 'linear':
         const linearNorm = (frequency - minFreq) / (maxFreq - minFreq);
-        return minRadius + (linearNorm * (maxRadius - minRadius));
+        const linearSize = minRadius + (linearNorm * (maxRadius - minRadius));
+        return isNaN(linearSize) ? minRadius : linearSize;
       
       case 'sqrt':
         const sqrtMin = Math.sqrt(minFreq);
         const sqrtMax = Math.sqrt(maxFreq);
         const sqrtValue = Math.sqrt(frequency);
         const sqrtNorm = (sqrtValue - sqrtMin) / (sqrtMax - sqrtMin);
-        return minRadius + (sqrtNorm * (maxRadius - minRadius));
+        const sqrtSize = minRadius + (sqrtNorm * (maxRadius - minRadius));
+        return isNaN(sqrtSize) ? minRadius : sqrtSize;
       
       case 'log':
         const logMin = Math.log(Math.max(1, minFreq));
         const logMax = Math.log(Math.max(1, maxFreq));
         const logValue = Math.log(Math.max(1, frequency));
         const logNorm = (logValue - logMin) / (logMax - logMin);
-        return minRadius + (logNorm * (maxRadius - minRadius));
+        const logSize = minRadius + (logNorm * (maxRadius - minRadius));
+        return isNaN(logSize) ? minRadius : logSize;
       
       default:
         return minRadius;
@@ -326,7 +334,7 @@ const EtymologicalFamiliesViz = () => {
       bubblesMerged
         .attr("cx", d => xScale(d.xPosition))
         .attr("cy", d => yScale(d.yPosition))
-        .attr("r", d => d.bubbleSize)
+        .attr("r", d => isNaN(d.bubbleSize) ? 15 : Math.max(5, d.bubbleSize))
         .attr("fill", d => d.color)
         .attr("stroke", "#fff")
         .attr("stroke-width", 2)

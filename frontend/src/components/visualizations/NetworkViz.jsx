@@ -14,6 +14,17 @@ import {
   FaDownload
 } from 'react-icons/fa';
 import * as d3 from 'd3';
+
+// Utility function to safely handle numeric values for D3 attributes
+const safeNumeric = (value, defaultValue = 0, min = null, max = null) => {
+  if (isNaN(value) || value === null || value === undefined) {
+    return defaultValue;
+  }
+  let result = Number(value);
+  if (min !== null) result = Math.max(min, result);
+  if (max !== null) result = Math.min(max, result);
+  return result;
+};
 import { API_BASE_URL } from '../../config/api.js';
 
 // Debounce hook for performance optimization
@@ -168,7 +179,7 @@ const NetworkViz = () => {
         .append("line")
         .attr("stroke", "#999")
         .attr("stroke-opacity", 0.6)
-        .attr("stroke-width", d => Math.sqrt(d.strength * 10));
+        .attr("stroke-width", d => safeNumeric(Math.sqrt(d.strength * 10), 1, 0.5, 5));
 
       // Create nodes with batched operations
       const nodeGroup = g.append("g").attr("class", "nodes");
@@ -176,7 +187,7 @@ const NetworkViz = () => {
         .data(filteredNetworkData.nodes)
         .enter()
         .append("circle")
-        .attr("r", d => d.size)
+        .attr("r", d => safeNumeric(d.size, 5, 3, 20))
         .attr("fill", d => getNodeColor(d))
         .attr("stroke", "#fff")
         .attr("stroke-width", 2)

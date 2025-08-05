@@ -31,16 +31,16 @@ if ! curl -s "http://${WINDOWS_HOST}:11434/" > /dev/null 2>&1; then
     exit 1
 fi
 
-echo -e "${YELLOW}Verificando modelo qwen3:4b...${NC}"
+echo -e "${YELLOW}Verificando modelo Qwen2.5-Coder:32B...${NC}"
 echo
 
 # Check if the required model is available
-if ! curl -s "http://${WINDOWS_HOST}:11434/api/tags" | grep -q "qwen3:4b"; then
-    echo -e "${RED}❌ Modelo qwen3:4b no encontrado${NC}"
-    echo -e "${YELLOW}Descargando modelo qwen3:4b...${NC}"
+if ! curl -s "http://${WINDOWS_HOST}:11434/api/tags" | grep -q "Qwen2.5-Coder:32B"; then
+    echo -e "${RED}❌ Modelo Qwen2.5-Coder:32B no encontrado${NC}"
+    echo -e "${YELLOW}Descargando modelo Qwen2.5-Coder:32B...${NC}"
     curl -X POST "http://${WINDOWS_HOST}:11434/api/pull" \
          -H "Content-Type: application/json" \
-         -d '{"name": "qwen3:4b"}'
+         -d '{"name": "Qwen2.5-Coder:32B"}'
 fi
 
 echo -e "${YELLOW}Verificando directorio de datos...${NC}"

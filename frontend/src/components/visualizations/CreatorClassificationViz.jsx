@@ -437,8 +437,14 @@ const CreatorClassificationViz = () => {
       .attr("transform", d => `translate(${d.x0},${d.y0})`);
 
     leaf.append("rect")
-      .attr("width", d => d.x1 - d.x0)
-      .attr("height", d => d.y1 - d.y0)
+      .attr("width", d => {
+        const width = d.x1 - d.x0;
+        return isNaN(width) || width < 0 ? 0 : width;
+      })
+      .attr("height", d => {
+        const height = d.y1 - d.y0;
+        return isNaN(height) || height < 0 ? 0 : height;
+      })
       .attr("fill", d => d.data.color)
       .attr("stroke", "#fff")
       .attr("stroke-width", 2)

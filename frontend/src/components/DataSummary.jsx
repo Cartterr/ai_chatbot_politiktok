@@ -106,8 +106,8 @@ const DataSummary = ({ data, isLoading: dataLoading }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          data_summary: data,
-          focus_areas: ['trends', 'patterns', 'anomalies']
+          insight_type: selectedInsightType,
+          focus_area: focusArea || null
         })
       });
 

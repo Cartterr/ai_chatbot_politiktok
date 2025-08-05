@@ -28,8 +28,8 @@ else:
 OLLAMA_API_BASE = os.environ.get("OLLAMA_API_BASE", OLLAMA_API_BASE)
 logger.info(f"Final Ollama Base URL: {OLLAMA_API_BASE}")
 
-# Default model updated to qwen3:4b
-DEFAULT_MODEL = "qwen3:4b"
+# Default model updated to Qwen2.5-Coder:32B
+DEFAULT_MODEL = "Qwen2.5-Coder:32B"
 
 # --- Functions ---
 

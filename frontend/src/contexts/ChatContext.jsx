@@ -10,7 +10,7 @@ export const ChatProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [availableModels, setAvailableModels] = useState([]);
   // Default to a known model ID, ensure it matches backend/Ollama if possible
-  const [selectedModel, setSelectedModel] = useState('qwen3:4b');
+  const [selectedModel, setSelectedModel] = useState('Qwen2.5-Coder:32B');
   const [error, setError] = useState(null);
 
   // Load messages from localStorage on initial render
@@ -58,7 +58,7 @@ export const ChatProvider = ({ children }) => {
              setError('No hay modelos disponibles desde el backend.');
              setAvailableModels([
                // ---> TRANSLATED DEFAULT NAME <---
-               { name: 'Qwen3 4B (Predet.)', id: 'qwen3:4b' }
+               { name: 'Qwen2.5-Coder 32B (Predet.)', id: 'Qwen2.5-Coder:32B' }
              ]);
          }
       } else {
@@ -67,13 +67,13 @@ export const ChatProvider = ({ children }) => {
            setError('Se recibieron datos de modelos inválidos desde el backend.');
            setAvailableModels([
              // ---> TRANSLATED DEFAULT NAME <---
-             { name: 'Qwen3 4B (Predet.)', id: 'qwen3:4b' }
+             { name: 'Qwen2.5-Coder 32B (Predet.)', id: 'Qwen2.5-Coder:32B' }
            ]);
       }
     } catch (error) {
         console.error('Error fetching models:', error);
         setError('Fallo al obtener los modelos disponibles. ¿Está el backend funcionando?');
-        setAvailableModels([ { name: 'Qwen3 4B (Predet.)', id: 'qwen3:4b' } ]);
+        setAvailableModels([ { name: 'Qwen2.5-Coder 32B (Predet.)', id: 'Qwen2.5-Coder:32B' } ]);
     }
   };
 
@@ -109,6 +109,8 @@ export const ChatProvider = ({ children }) => {
         content: response.data.answer || 'No se recibió respuesta', // Default fallback text
         timestamp: new Date().toISOString(),
         relevantData: response.data.relevant_data, // Pass relevant data if needed
+        dataSources: response.data.data_sources, // Pass data sources information
+        queryAnalysis: response.data.query_analysis, // Pass query analysis
       };
 
       // If visualization was requested and provided

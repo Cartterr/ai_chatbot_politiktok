@@ -4,6 +4,7 @@ import { FaPaperPlane, FaRobot, FaUser, FaTrash, FaChartBar, FaRegCopy, FaChevro
 import ReactMarkdown from 'react-markdown';
 import { useChatContext } from '../contexts/ChatContext';
 import VisualizationDisplay from './VisualizationDisplay'; // Assuming this component exists
+import DataSourcesDisplay from './DataSourcesDisplay';
 
 const MessageItem = ({ message, openFullscreen }) => {
   const isUser = message.sender === 'user';
@@ -78,22 +79,29 @@ const MessageItem = ({ message, openFullscreen }) => {
         </div>
       )}
 
-      {message.relevantData && Object.keys(message.relevantData).length > 1 && ( // Check if relevantData has more than just summary/status
+      {/* Display data sources if available */}
+      {message.dataSources && message.dataSources.length > 0 && (
+        <DataSourcesDisplay 
+          dataSources={message.dataSources}
+          queryAnalysis={message.queryAnalysis}
+        />
+      )}
+
+      {/* Fallback for old format */}
+      {!message.dataSources && message.relevantData && Object.keys(message.relevantData).length > 1 && (
         <div className="mt-4 pt-3 border-t border-gray-200/50">
           <details className="text-sm">
-            <summary className="cursor-pointer text-indigo-500 hover:text-indigo-700 flex items-center list-none"> {/* Remove default marker */}
-               <FaChevronRight className="text-xs mr-1 transform transition-transform duration-200 group-open:rotate-90" /> {/* Simple rotate */}
-              <span className="group-open:font-medium"> {/* Highlight when open */}
-                 Ver fuentes de datos relevantes {/* Spanish */}
+            <summary className="cursor-pointer text-indigo-500 hover:text-indigo-700 flex items-center list-none">
+               <FaChevronRight className="text-xs mr-1 transform transition-transform duration-200 group-open:rotate-90" />
+              <span className="group-open:font-medium">
+                 Ver fuentes de datos relevantes
               </span>
             </summary>
             <div className="mt-2 p-3 bg-gray-50 rounded-lg text-xs text-gray-600">
-              {/* Simple list of relevant data keys found */}
               Datos considerados: {Object.entries(message.relevantData)
                  .filter(([key, value]) => Array.isArray(value) && value.length > 0)
                  .map(([key]) => key)
                  .join(', ') || 'Resumen general'}
-              {/* You could make this more detailed if needed */}
             </div>
           </details>
         </div>

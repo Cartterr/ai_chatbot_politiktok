@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import os
 import logging
 from typing import Dict, Any
@@ -117,7 +118,7 @@ def get_data_summary(data: Dict[str, Any]) -> Dict[str, Any]:
             summary[key] = {
                 "rows": len(df),
                 "columns": df.columns.tolist(),
-                "sample": df.head(5).to_dict(orient="records")
+                "sample": df.head(5).replace([pd.NA, np.nan], [None, None]).to_dict(orient="records")
             }
             
             # Add specific statistics for each dataframe
@@ -201,3 +202,130 @@ def filter_data_by_query(data: Dict[str, Any], query: str) -> Dict[str, Any]:
             filtered_data["words"] = filtered_words
     
     return filtered_data
+
+def determine_relevant_datasets(query: str, data: Dict[str, Any]) -> Dict[str, float]:
+    """
+    Determine which datasets are relevant for a given query.
+    Returns a dict with dataset names as keys and relevance scores as values.
+    """
+    query_lower = query.lower()
+    relevance_scores = {}
+    
+    # Keywords that indicate which datasets might be relevant
+    dataset_keywords = {
+        "accounts": [
+            "cuenta", "creador", "usuario", "perfil", "seguidor", "influencer", 
+            "perspectiva", "ideología", "política", "orientación", "biografía",
+            "followers", "creator", "account", "profile", "perspective", "ideology"
+        ],
+        "videos": [
+            "video", "contenido", "publicación", "post", "views", "visualización",
+            "fecha", "tiempo", "temporal", "evolución", "tendencia", "viral",
+            "content", "publication", "date", "time", "trend", "evolution"
+        ],
+        "subtitles": [
+            "subtítulo", "transcripción", "texto", "habla", "dice", "menciona",
+            "palabra", "frase", "discurso", "conversación", "diálogo",
+            "subtitle", "transcription", "text", "speech", "word", "phrase", "dialogue"
+        ],
+        "words": [
+            "palabra", "término", "sentimiento", "emoción", "análisis", "semántico",
+            "significado", "connotación", "polaridad", "positivo", "negativo",
+            "word", "term", "sentiment", "emotion", "meaning", "positive", "negative"
+        ]
+    }
+    
+    # Calculate relevance scores
+    for dataset_name, keywords in dataset_keywords.items():
+        if dataset_name in data and not data[dataset_name].empty:
+            score = 0
+            for keyword in keywords:
+                if keyword in query_lower:
+                    score += 1
+            
+            # Normalize score (0-1 range)
+            relevance_scores[dataset_name] = min(score / len(keywords), 1.0)
+    
+    # If no specific keywords found, include all datasets with lower relevance
+    if not any(score > 0 for score in relevance_scores.values()):
+        for dataset_name in data.keys():
+            if not data[dataset_name].empty:
+                relevance_scores[dataset_name] = 0.3  # Default relevance
+    
+    # Filter out datasets with zero relevance
+    return {k: v for k, v in relevance_scores.items() if v > 0}
+
+def get_relevant_data_summary(data: Dict[str, Any], relevant_datasets: Dict[str, float], query: str) -> Dict[str, Any]:
+    """
+    Generate a summary focused on the relevant datasets for a query.
+    """
+    # File mapping for display names
+    file_mapping = {
+        "accounts": {
+            "filename": "cuentas_info.csv",
+            "description": "Información de cuentas de TikTok y creadores",
+            "contains": "Datos de perfiles, seguidores, perspectivas políticas"
+        },
+        "videos": {
+            "filename": "combined_tiktok_data_cleaned_with_date.csv",
+            "description": "Datos de videos de TikTok con fechas",
+            "contains": "Información de videos, visualizaciones, fechas de publicación"
+        },
+        "subtitles": {
+            "filename": "subtitulos_videos_v3.csv",
+            "description": "Subtítulos y transcripciones de videos",
+            "contains": "Texto hablado, transcripciones, contenido verbal"
+        },
+        "words": {
+            "filename": "data.csv",
+            "description": "Análisis de palabras y sentimientos",
+            "contains": "Palabras, análisis de sentimientos, polaridad"
+        }
+    }
+    
+    # Generate summary for relevant datasets only
+    data_summary = {}
+    sources = []
+    
+    for dataset_name, relevance_score in sorted(relevant_datasets.items(), key=lambda x: x[1], reverse=True):
+        if dataset_name in data and not data[dataset_name].empty:
+            df = data[dataset_name]
+            
+            # Add to data summary
+            data_summary[dataset_name] = {
+                "rows": len(df),
+                "columns": df.columns.tolist(),
+                "relevance_score": relevance_score,
+                "sample": df.head(3).replace([pd.NA, np.nan], [None, None]).to_dict(orient="records")  # Smaller sample for relevant data
+            }
+            
+            # Add specific statistics
+            if dataset_name == "accounts" and "perspective" in df.columns:
+                data_summary[dataset_name]["perspective_counts"] = df["perspective"].value_counts().to_dict()
+            elif dataset_name == "videos" and "views" in df.columns:
+                data_summary[dataset_name]["avg_views"] = float(df["views"].mean())
+                data_summary[dataset_name]["total_views"] = float(df["views"].sum())
+            elif dataset_name == "words" and "sentimiento" in df.columns:
+                sentiment_counts = df["sentimiento"].value_counts().to_dict()
+                data_summary[dataset_name]["sentiment_counts"] = {str(k): v for k, v in sentiment_counts.items()}
+            
+            # Add to sources list
+            if dataset_name in file_mapping:
+                sources.append({
+                    "dataset": dataset_name,
+                    "filename": file_mapping[dataset_name]["filename"],
+                    "description": file_mapping[dataset_name]["description"],
+                    "contains": file_mapping[dataset_name]["contains"],
+                    "relevance_score": relevance_score,
+                    "rows": len(df),
+                    "columns": len(df.columns)
+                })
+    
+    # Generate query analysis
+    query_analysis = f"Consulta: '{query}' - Se identificaron {len(sources)} fuentes de datos relevantes"
+    
+    return {
+        "data_summary": data_summary,
+        "sources": sources,
+        "query_analysis": query_analysis
+    }

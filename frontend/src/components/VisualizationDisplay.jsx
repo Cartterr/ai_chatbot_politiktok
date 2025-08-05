@@ -42,6 +42,25 @@ const renderCustomizedPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, 
   );
 };
 
+// --- Filter Information Component ---
+const FilterInfo = ({ filterInfo }) => {
+  if (!filterInfo?.filtered) return null;
+  
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+      <div className="flex items-center space-x-2">
+        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+        <span className="text-sm font-medium text-blue-800">
+          Filtrado por: "{filterInfo.query}"
+        </span>
+      </div>
+      <div className="mt-1 text-xs text-blue-600">
+        Mostrando {filterInfo.filtered_records.toLocaleString()} de {filterInfo.original_records.toLocaleString()} registros
+      </div>
+    </div>
+  );
+};
+
 // --- Specific Chart Components ---
 
 const TimeSeriesVisualization = ({ data, openFullscreen, isFullscreen }) => {
@@ -64,6 +83,7 @@ const TimeSeriesVisualization = ({ data, openFullscreen, isFullscreen }) => {
         )}
         <div className="space-y-6">
             <h3 className="text-lg font-semibold text-gray-800 pr-8">{data.title || 'Análisis Temporal'}</h3>
+            <FilterInfo filterInfo={data.filter_info} />
             <ResponsiveContainer width="100%" height={isFullscreen ? 450 : 300}>
                 <AreaChart data={combinedData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                     <defs>
@@ -110,6 +130,7 @@ const ComparisonVisualization = ({ data, openFullscreen, isFullscreen }) => {
          {!isFullscreen && ( <button onClick={() => openFullscreen(data)} className="absolute top-2 right-2 z-10 p-1.5 bg-gray-100/50 text-gray-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-200 hover:text-gray-700" title="Ver en pantalla completa"> <FaExpand className="w-3 h-3" /> </button> )}
          <div className="space-y-8">
             <h3 className="text-lg font-semibold text-gray-800 pr-8">{data.title || 'Comparación'}</h3>
+            <FilterInfo filterInfo={data.filter_info} />
             {/* Followers Bar */}
             {data.follower_comparison?.length > 0 && (
                 <div>
@@ -299,6 +320,7 @@ const SentimentVisualization = ({ data }) => {
   return (
     <div className="space-y-8">
       <h3 className="text-lg font-semibold text-gray-800">{data.title || 'Análisis de Sentimiento'}</h3>
+      <FilterInfo filterInfo={data.filter_info} />
 
       {/* Avg Sentiment by User Bar Chart */}
       {data.by_user?.length > 0 && (
@@ -331,7 +353,7 @@ const SentimentVisualization = ({ data }) => {
             <h4 className="text-md font-medium mt-4 mb-2 text-gray-700">Detalles por Video (Top 50 por Ratio)</h4>
             <div className="bg-gray-50 p-3 rounded-lg max-h-80 overflow-y-auto border border-gray-200"> {/* Increased height */}
             <table className="min-w-full divide-y divide-gray-200 text-xs">
-                <thead className="bg-gray-100 sticky top-0"> {/* Sticky header */}
+                <thead className="bg-gray-100 sticky top-0">
                 <tr>
                     <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Pos</th>
@@ -375,6 +397,100 @@ const SentimentVisualization = ({ data }) => {
   );
 };
 
+// --- Focused Chart Visualization Component ---
+const FocusedChartVisualization = ({ data, openFullscreen, isFullscreen }) => {
+  const { chart, stats, filter_info } = data;
+  
+  if (!chart) {
+    return (
+      <div className="p-6 bg-yellow-50 text-yellow-700 rounded-lg border border-yellow-200">
+        <p className="font-semibold mb-1">No hay gráfico disponible</p>
+        <p className="text-sm">No se pudo generar un gráfico individual con los datos disponibles.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <FilterInfo filterInfo={filter_info} />
+      
+      {/* Title */}
+      <div className="text-center">
+        <h3 className="text-xl font-bold text-gray-800 mb-2">{data.title}</h3>
+      </div>
+
+      {/* Single Chart */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h4 className="text-lg font-semibold text-gray-700 mb-4">{chart.title}</h4>
+        
+        {chart.type === 'pie' && (
+          <ResponsiveContainer width="100%" height={400}>
+            <PieChart>
+              <Pie
+                data={chart.data}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(1)}%`}
+                outerRadius={120}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {chart.data.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        )}
+        
+        {chart.type === 'bar' && (
+          <ResponsiveContainer width="100%" height={400}>
+            <BarChart data={chart.data} layout="horizontal" margin={{ top: 20, right: 30, left: 100, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="number" />
+              <YAxis 
+                type="category" 
+                dataKey="name" 
+                width={90}
+                tick={{ fontSize: 12 }}
+                tickFormatter={(value) => value.length > 15 ? value.substring(0, 15) + '...' : value}
+              />
+              <Tooltip />
+              <Bar dataKey="value" fill="#3B82F6" />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Stats Summary */}
+      {stats && Object.keys(stats).length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Object.entries(stats).map(([key, value]) => (
+            <div key={key} className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg p-4 text-center border border-blue-200">
+              <div className="text-2xl font-bold text-indigo-600">{value?.toLocaleString() || 0}</div>
+              <div className="text-sm text-indigo-700 font-medium">{key}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {/* Fullscreen Button */}
+      {!isFullscreen && (
+        <div className="text-center">
+          <button
+            onClick={() => openFullscreen(data)}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200"
+          >
+            Ver en pantalla completa
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const SummaryVisualization = ({ data }) => {
   const hasData = (data?.charts?.length > 0) || (data?.stats && Object.keys(data.stats).length > 0);
@@ -385,6 +501,7 @@ const SummaryVisualization = ({ data }) => {
   return (
     <div className="space-y-8">
       <h3 className="text-lg font-semibold text-gray-800">{data.title || 'Resumen de Datos'}</h3>
+      <FilterInfo filterInfo={data.filter_info} />
 
       {/* Stats Overview */}
       {data.stats && Object.keys(data.stats).length > 0 && (
@@ -434,28 +551,37 @@ const SummaryVisualization = ({ data }) => {
                     <Legend wrapperStyle={{ fontSize: '11px' }} />
                     <Line type="monotone" dataKey="value" stroke={COLORS[idx % COLORS.length]} name="Valor" dot={false} strokeWidth={2}/>
                   </LineChart>
-                ) : ( // Default to Bar Chart (handles horizontal/vertical based on data length)
+                ) : ( // Always use vertical bar charts for better readability
                   <BarChart
                     data={chart.data}
-                    layout={chart.data.length > 6 ? "vertical" : "horizontal"} // Switch layout based on items
-                    margin={chart.data.length > 6 ? { top: 5, right: 20, left: 20, bottom: 5 } : { top: 5, right: 5, left: 5, bottom: 40 } }
+                    layout="vertical"
+                    margin={{ top: 5, right: 50, left: 20, bottom: 5 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb"/>
-                    {chart.data.length > 6 ? ( // Vertical layout axes
-                       <>
-                         <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={formatNumber}/>
-                         <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 10 }} interval={0}/>
-                       </>
-                    ) : ( // Horizontal layout axes
-                       <>
-                         <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-20} textAnchor="end" height={50} interval={0}/>
-                         <YAxis tick={{ fontSize: 10 }} tickFormatter={formatNumber}/>
-                       </>
-                    )}
-                    <Tooltip formatter={(value, name) => [formatNumber(value), name]} cursor={{ fill: '#f9fafb' }}/>
-                    <Bar dataKey="value" fill={COLORS[idx % COLORS.length]} name="Valor" barSize={chart.data.length > 6 ? 15 : undefined}>
-                        {/* Add labels only if few bars, otherwise too cluttered */}
-                        {chart.data.length <= 10 && <LabelList dataKey="value" position={chart.data.length > 6 ? "right" : "top"} formatter={formatNumber} style={{ fontSize: 9, fill: '#4b5563' }} />}
+                    <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={formatNumber}/>
+                    <YAxis 
+                      dataKey="name" 
+                      type="category" 
+                      width={120} 
+                      tick={{ fontSize: 9 }} 
+                      interval={0}
+                      tickFormatter={(value) => {
+                        // Truncate long names for better display
+                        return value.length > 15 ? value.substring(0, 15) + '...' : value;
+                      }}
+                    />
+                    <Tooltip 
+                      formatter={(value, name) => [formatNumber(value), name]} 
+                      labelFormatter={(label) => label}
+                    />
+                    <Bar dataKey="value" fill={COLORS[idx % COLORS.length]} radius={[0, 2, 2, 0]}>
+                      <LabelList 
+                        dataKey="value" 
+                        position="right" 
+                        offset={5} 
+                        style={{ fontSize: '9px', fill: '#4b5563' }} 
+                        formatter={formatNumber} 
+                      />
                     </Bar>
                   </BarChart>
                 )}
@@ -486,6 +612,22 @@ const VisualizationDisplay = ({ visualization, openFullscreen, isFullscreen = fa
     case 'network': return <div className="p-4 text-center text-gray-500">Visualización de Red no implementada.</div>; // Placeholder
     case 'sentiment': return <SentimentVisualization data={visualization} openFullscreen={openFullscreen} isFullscreen={isFullscreen} />;
     case 'summary': return <SummaryVisualization data={visualization} openFullscreen={openFullscreen} isFullscreen={isFullscreen} />; // Pass props
+    case 'focused_chart': return <FocusedChartVisualization data={visualization} openFullscreen={openFullscreen} isFullscreen={isFullscreen} />;
+    case 'no_data': 
+      return (
+        <div className="p-8 bg-blue-50 rounded-lg border border-blue-200 text-center">
+          <div className="mb-4">
+            <svg className="mx-auto h-12 w-12 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.034 0-3.9.785-5.291 2.09M6.343 6.343A8 8 0 1017.657 17.657 8 8 0 006.343 6.343z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-blue-800 mb-2">{visualization.title}</h3>
+          <p className="text-blue-700 mb-3">{visualization.message}</p>
+          {visualization.suggestion && (
+            <p className="text-sm text-blue-600 italic">{visualization.suggestion}</p>
+          )}
+        </div>
+      );
     default:
       return (
         <div className="p-6 bg-yellow-50 rounded-lg border border-yellow-200 text-center text-yellow-700">
