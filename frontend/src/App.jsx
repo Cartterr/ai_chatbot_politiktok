@@ -191,7 +191,15 @@ const App = () => {
       {/* --- Sidebar --- */}
       <aside className="w-16 md:w-20 bg-gradient-to-b from-indigo-700 to-purple-800 text-indigo-100 flex flex-col items-center py-5 shadow-lg">
         <div className="mb-10 mt-1">
-          <img src={politiktokLogo} alt="PoliTikTok Logo" className="w-10 h-10 md:w-12 md:h-12 object-contain"/>
+          <a 
+            href="https://politiktok.cl/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="block hover:opacity-80 transition-opacity duration-200"
+            title="Ir a PoliTikTok.cl"
+          >
+            <img src={politiktokLogo} alt="PoliTikTok Logo" className="w-10 h-10 md:w-12 md:h-12 object-contain"/>
+          </a>
         </div>
         <nav className="flex flex-col items-center space-y-5">
           {/* Navigation Buttons */}

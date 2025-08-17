@@ -42,6 +42,9 @@ backend/venv/
 .env.test.local
 .env.production.local
 
+# Management scripts environment (excluded from gitignore)
+!backend/management/.env
+
 # Logs
 logs
 *.log
