@@ -2,11 +2,16 @@ import pandas as pd
 import numpy as np
 import os
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple
+from datetime import datetime
+import re
+from collections import Counter
 
 logger = logging.getLogger(__name__)
 
 DATA_DIR = "../data"
+OUTPUT_DIR = "../data/output"
+CLEAN_OUTPUT_DIR = "../data/output/clean"
 
 def load_all_data() -> Dict[str, Any]:
     """
@@ -32,38 +37,56 @@ def load_all_data() -> Dict[str, Any]:
             logger.error(f"Error loading accounts data: {str(e)}")
             data["accounts"] = pd.DataFrame()
         
-        # Load TikTok videos data
+        # Load TikTok videos data - MAIN CORE from correct clean file
         try:
-            videos_path = os.path.join(DATA_DIR, "combined_tiktok_data_cleaned_with_date.parquet")
-            if os.path.exists(videos_path):
-                data["videos"] = pd.read_parquet(videos_path)
+            main_videos_path = os.path.join(CLEAN_OUTPUT_DIR, "main_tiktok_data_clean.parquet")
+            if os.path.exists(main_videos_path):
+                data["videos"] = pd.read_parquet(main_videos_path)
             else:
-                data["videos"] = pd.read_csv(os.path.join(DATA_DIR, "combined_tiktok_data_cleaned_with_date.csv"))
+                data["videos"] = pd.read_csv(os.path.join(CLEAN_OUTPUT_DIR, "main_tiktok_data_clean.csv"))
+                logger.info(f"Loaded MAIN CORE videos data: {len(data['videos'])} rows with comprehensive info")
         except Exception as e:
-            logger.error(f"Error loading videos data: {str(e)}")
-            data["videos"] = pd.DataFrame()
+            logger.error(f"Error loading main core videos data: {str(e)}")
+            try:
+                data["videos"] = pd.read_csv(os.path.join(OUTPUT_DIR, "final_tiktok_data_cleaned_v2.csv"))
+                logger.info("Loaded videos data from original main core file")
+            except Exception as e2:
+                logger.error(f"Error loading fallback main core data: {str(e2)}")
+                data["videos"] = pd.DataFrame()
         
-        # Load word sentiment data
+        # Load additional dates data for temporal analysis
         try:
-            words_path = os.path.join(DATA_DIR, "data.parquet")
-            if os.path.exists(words_path):
-                data["words"] = pd.read_parquet(words_path)
+            dates_path = os.path.join(CLEAN_OUTPUT_DIR, "combined_tiktok_data_with_dates_clean.parquet")
+            if os.path.exists(dates_path):
+                data["dates"] = pd.read_parquet(dates_path)
             else:
-                data["words"] = pd.read_csv(os.path.join(DATA_DIR, "data.csv"))
+                data["dates"] = pd.read_csv(os.path.join(CLEAN_OUTPUT_DIR, "combined_tiktok_data_with_dates_clean.csv"))
+                logger.info(f"Loaded DATES data: {len(data['dates'])} rows for temporal analysis")
         except Exception as e:
-            logger.error(f"Error loading word data: {str(e)}")
-            data["words"] = pd.DataFrame()
+            logger.error(f"Error loading dates data: {str(e)}")
+            try:
+                data["dates"] = pd.read_csv(os.path.join(DATA_DIR, "combined_tiktok_data_cleaned_with_date.csv"))
+                logger.info("Loaded dates data from original file")
+            except Exception as e2:
+                logger.error(f"Error loading fallback dates data: {str(e2)}")
+                data["dates"] = pd.DataFrame()
         
-        # Load subtitles data
+        # Load subtitles data from clean version
         try:
-            subtitles_path = os.path.join(DATA_DIR, "subtitulos_videos_v3.parquet")
-            if os.path.exists(subtitles_path):
-                data["subtitles"] = pd.read_parquet(subtitles_path)
+            clean_subtitles_path = os.path.join(CLEAN_OUTPUT_DIR, "subtitles_clean.parquet")
+            if os.path.exists(clean_subtitles_path):
+                data["subtitles"] = pd.read_parquet(clean_subtitles_path)
             else:
-                data["subtitles"] = pd.read_csv(os.path.join(DATA_DIR, "subtitulos_videos_v3.csv"))
+                data["subtitles"] = pd.read_csv(os.path.join(CLEAN_OUTPUT_DIR, "subtitles_clean.csv"))
+                logger.info(f"Loaded CLEAN SUBTITLES data: {len(data['subtitles'])} rows")
         except Exception as e:
-            logger.error(f"Error loading subtitles data: {str(e)}")
-            data["subtitles"] = pd.DataFrame()
+            logger.error(f"Error loading clean subtitles data: {str(e)}")
+            try:
+                data["subtitles"] = pd.read_csv(os.path.join(DATA_DIR, "subtitulos_videos_v3.csv"), low_memory=False)
+                logger.info("Loaded subtitles data from original file")
+            except Exception as e2:
+                logger.error(f"Error loading fallback subtitles data: {str(e2)}")
+                data["subtitles"] = pd.DataFrame()
         
         # Process data after loading
         process_data(data)
@@ -329,3 +352,188 @@ def get_relevant_data_summary(data: Dict[str, Any], relevant_datasets: Dict[str,
         "sources": sources,
         "query_analysis": query_analysis
     }
+
+def analyze_word_usage_by_date(data: Dict[str, Any], word: str) -> Dict[str, Any]:
+    """
+    Analyze when a specific word and its derivatives were used most frequently
+    """
+    try:
+        # Use the dates dataset primarily, fall back to videos if needed
+        if "dates" in data and not data["dates"].empty:
+            df = data["dates"].copy()
+            logger.info(f"Using dates dataset for temporal analysis: {len(df)} rows")
+        elif "videos" in data and not data["videos"].empty:
+            df = data["videos"].copy()
+            logger.info(f"Using videos dataset for temporal analysis: {len(df)} rows")
+        else:
+            return {"error": "No video or dates data available for date analysis"}
+        
+        # Ensure we have the necessary columns
+        if "transcription" not in df.columns and "title" not in df.columns:
+            return {"error": "No text content available for word analysis"}
+        
+        # Combine text fields for analysis
+        df["combined_text"] = ""
+        if "transcription" in df.columns:
+            df["combined_text"] += df["transcription"].fillna("")
+        if "title" in df.columns:
+            df["combined_text"] += " " + df["title"].fillna("")
+        
+        # Clean and prepare the word for search
+        word_clean = word.lower().strip()
+        
+        # Create derivative patterns for the word
+        derivatives = generate_word_derivatives(word_clean)
+        
+        # Find videos containing the word or its derivatives
+        pattern = "|".join([re.escape(deriv) for deriv in derivatives])
+        mask = df["combined_text"].str.lower().str.contains(pattern, na=False, regex=True)
+        
+        matching_videos = df[mask].copy()
+        
+        if matching_videos.empty:
+            return {
+                "word": word,
+                "derivatives_searched": derivatives,
+                "total_matches": 0,
+                "message": f"No se encontraron videos que contengan la palabra '{word}' o sus derivadas"
+            }
+        
+        # Process dates
+        date_column = None
+        if "upload_date" in matching_videos.columns:
+            date_column = "upload_date"
+        elif "date" in matching_videos.columns:
+            date_column = "date"
+        
+        if date_column is None:
+            return {
+                "word": word,
+                "derivatives_searched": derivatives,
+                "total_matches": len(matching_videos),
+                "message": "No hay información de fechas disponible en los datos"
+            }
+        
+        # Clean and parse dates
+        matching_videos[date_column] = pd.to_datetime(matching_videos[date_column], errors='coerce')
+        matching_videos = matching_videos.dropna(subset=[date_column])
+        
+        if matching_videos.empty:
+            return {
+                "word": word,
+                "derivatives_searched": derivatives,
+                "total_matches": len(df[mask]),
+                "message": "No hay fechas válidas en los videos que contienen la palabra"
+            }
+        
+        # Analyze by different time periods
+        matching_videos["year"] = matching_videos[date_column].dt.year
+        matching_videos["month"] = matching_videos[date_column].dt.to_period('M')
+        matching_videos["date_only"] = matching_videos[date_column].dt.date
+        
+        # Count occurrences by time period
+        yearly_counts = matching_videos["year"].value_counts().sort_index()
+        monthly_counts = matching_videos["month"].value_counts().sort_index()
+        daily_counts = matching_videos["date_only"].value_counts().sort_index()
+        
+        # Get top dates
+        top_years = yearly_counts.head(5).to_dict()
+        top_months = monthly_counts.head(10).to_dict()
+        top_days = daily_counts.head(10).to_dict()
+        
+        # Convert Period objects to strings for JSON serialization
+        top_months_str = {str(k): v for k, v in top_months.items()}
+        top_days_str = {str(k): v for k, v in top_days.items()}
+        
+        # Get sample videos from top dates
+        top_day = daily_counts.index[0] if len(daily_counts) > 0 else None
+        sample_videos = []
+        
+        if top_day:
+            day_videos = matching_videos[matching_videos["date_only"] == top_day]
+            for _, video in day_videos.head(3).iterrows():
+                sample_videos.append({
+                    "username": video.get("username", ""),
+                    "date": str(video[date_column]),
+                    "title": video.get("title", "")[:100] + "..." if len(str(video.get("title", ""))) > 100 else video.get("title", ""),
+                    "views": video.get("views", 0)
+                })
+        
+        return {
+            "word": word,
+            "derivatives_searched": derivatives,
+            "total_matches": len(matching_videos),
+            "date_range": {
+                "earliest": str(matching_videos[date_column].min()),
+                "latest": str(matching_videos[date_column].max())
+            },
+            "top_years": top_years,
+            "top_months": top_months_str,
+            "top_days": top_days_str,
+            "most_active_day": str(top_day) if top_day else None,
+            "most_active_day_count": int(daily_counts.iloc[0]) if len(daily_counts) > 0 else 0,
+            "sample_videos": sample_videos
+        }
+        
+    except Exception as e:
+        logger.error(f"Error analyzing word usage by date: {str(e)}")
+        return {"error": f"Error en el análisis: {str(e)}"}
+
+def generate_word_derivatives(word: str) -> List[str]:
+    """
+    Generate common derivatives of a word for more comprehensive search
+    """
+    derivatives = [word]
+    
+    # Common Spanish word endings and variations
+    if word.endswith("cia"):
+        base = word[:-3]
+        derivatives.extend([
+            base + "cia",
+            base + "cias", 
+            base + "cio",
+            base + "cios"
+        ])
+    elif word.endswith("ncia"):
+        base = word[:-4]
+        derivatives.extend([
+            base + "ncia",
+            base + "ncias",
+            base + "ncio", 
+            base + "ncios"
+        ])
+    elif word.endswith("o"):
+        base = word[:-1]
+        derivatives.extend([
+            base + "o",
+            base + "a", 
+            base + "os",
+            base + "as"
+        ])
+    elif word.endswith("a"):
+        base = word[:-1]
+        derivatives.extend([
+            base + "a",
+            base + "o",
+            base + "as", 
+            base + "os"
+        ])
+    
+    # Add plurals
+    if not word.endswith("s"):
+        derivatives.append(word + "s")
+    
+    # Add common prefixes for negative/positive forms
+    prefixes = ["anti", "no", "pro", "contra"]
+    for prefix in prefixes:
+        derivatives.append(prefix + word)
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_derivatives = []
+    for item in derivatives:
+        if item not in seen:
+            seen.add(item)
+            unique_derivatives.append(item)
+    
+    return unique_derivatives

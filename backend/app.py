@@ -13,7 +13,8 @@ import re
 import asyncio
 
 # Import local modules
-from data_loader import load_all_data, get_data_summary, determine_relevant_datasets, get_relevant_data_summary
+from data_loader import load_all_data, get_data_summary, determine_relevant_datasets, get_relevant_data_summary, analyze_word_usage_by_date
+from smart_agent import search_with_agent, get_agent_info
 # Assuming embeddings are not the primary search method for now based on previous prompt structure
 # from embeddings import create_embeddings, semantic_search
 from visualization import generate_visualization
@@ -832,6 +833,46 @@ async def chat(query_model: QueryModel):
     query = query_model.query
     logger.info(f"Consulta recibida: '{query}' | Generar Viz: {query_model.generate_visualization} | Tipo Viz: {query_model.visualization_type} | Modelo: {query_model.model}")
 
+    # --- Smart Agent Analysis ---
+    smart_agent_result = None
+    date_analysis_result = None
+    date_keywords = ["fecha", "fechas", "cuando", "cuándo", "momento", "tiempo", "temporal", "día", "días", "mes", "año", "periodo"]
+    query_lower = query.lower()
+    
+    # Use smart agent for comprehensive search
+    try:
+        smart_agent_result = search_with_agent(query)
+        logger.info(f"🤖 Smart agent found {smart_agent_result['summary']['total_matches']} matches across {smart_agent_result['summary']['datasets_with_matches']} datasets")
+    except Exception as agent_err:
+        logger.error(f"❌ Smart agent error: {agent_err}")
+        smart_agent_result = None
+    
+    # Check if query is asking about dates/temporal patterns
+    is_date_query = any(keyword in query_lower for keyword in date_keywords)
+    
+    if is_date_query:
+        # Extract potential words to analyze
+        word_patterns = re.findall(r'\b(?:palabra|término|concepto)\s+["\']?(\w+)["\']?', query_lower)
+        if not word_patterns:
+            # Look for specific words mentioned in quotes or after "de"
+            word_patterns = re.findall(r'["\'](\w+)["\']', query)
+            if not word_patterns:
+                word_patterns = re.findall(r'\b(?:de\s+la?\s+)?(\w+)\s+y\s+sus\s+derivadas?', query_lower)
+                if not word_patterns:
+                    # Look for common political/social terms
+                    political_terms = ["violencia", "política", "democracia", "justicia", "igualdad", "libertad", "derechos"]
+                    word_patterns = [term for term in political_terms if term in query_lower]
+        
+        if word_patterns:
+            target_word = word_patterns[0]
+            logger.info(f"🗓️ Detectada consulta temporal sobre la palabra: '{target_word}'")
+            try:
+                date_analysis_result = analyze_word_usage_by_date(app_state["data"], target_word)
+                logger.info(f"✅ Análisis temporal completado para '{target_word}': {date_analysis_result.get('total_matches', 0)} coincidencias")
+            except Exception as date_err:
+                logger.error(f"❌ Error en análisis temporal: {date_err}")
+                date_analysis_result = {"error": f"Error en análisis temporal: {str(date_err)}"}
+
     # --- Context Preparation ---
     # Determine which datasets are relevant for this query
     relevant_data_summary = {}
@@ -881,13 +922,35 @@ async def chat(query_model: QueryModel):
         else:
             logger.info(f"   ⚡ SIN CAMBIOS: query mantenido como '{smart_query}'")
     
+    # Add smart agent and date analysis to context if available
+    agent_context = ""
+    if smart_agent_result and smart_agent_result['summary']['total_matches'] > 0:
+        agent_context = f"""
+
+BÚSQUEDA INTELIGENTE AUTOMÁTICA:
+```json
+{json.dumps(smart_agent_result, ensure_ascii=False, default=str, indent=2)}
+```"""
+    
+    date_context = ""
+    if date_analysis_result:
+        if "error" not in date_analysis_result:
+            date_context = f"""
+
+ANÁLISIS TEMPORAL ESPECÍFICO:
+```json
+{json.dumps(date_analysis_result, ensure_ascii=False, default=str, indent=2)}
+```"""
+        else:
+            date_context = f"\n\nNOTA: Error en análisis temporal: {date_analysis_result['error']}"
+
     prompt = f"""
 CONTEXTO: Eres un asistente de investigación IA experto en el análisis de datos sobre jóvenes chilenos y política en TikTok. Tu propósito es ayudar a entender cómo usan esta plataforma para discutir política, diversidad y justicia social.
 
 DATOS DISPONIBLES (RESUMEN GENERAL):
 ```json
 {context}
-```
+```{agent_context}{date_context}
 
 PREGUNTA DEL USUARIO: "{query}"{viz_context}
 
@@ -896,9 +959,13 @@ INSTRUCCIONES:
 2. Sé conciso y directo
 3. Si usas los datos, menciona "Según los datos disponibles..."
 4. Si no hay datos relevantes, indica "Los datos disponibles no especifican..."
-5. NO incluyas etiquetas, marcadores o texto de formato adicional
-6. Proporciona SOLO la respuesta final
-7. Si se menciona que se generará una visualización, puedes hacer referencia a ella diciendo "La visualización adjunta muestra..." o similar
+5. Si hay BÚSQUEDA INTELIGENTE AUTOMÁTICA disponible, prioriza esa información para respuestas específicas
+6. Si hay ANÁLISIS TEMPORAL ESPECÍFICO disponible, úsalo para responder preguntas sobre fechas y patrones temporales
+7. Para preguntas temporales, proporciona fechas específicas, rangos de tiempo y ejemplos concretos
+8. Combina información de múltiples fuentes cuando sea relevante (subtítulos, transcripciones, etc.)
+9. NO incluyas etiquetas, marcadores o texto de formato adicional
+10. Proporciona SOLO la respuesta final
+11. Si se menciona que se generará una visualización, puedes hacer referencia a ella diciendo "La visualización adjunta muestra..." o similar
 
 RESPUESTA:
 """
