@@ -37,21 +37,22 @@ def load_all_data() -> Dict[str, Any]:
             logger.error(f"Error loading accounts data: {str(e)}")
             data["accounts"] = pd.DataFrame()
         
-        # Load TikTok videos data - MAIN CORE from correct clean file
+        # Load ULTIMATE TEMPORAL dataset - combines all data sources with dates
         try:
-            main_videos_path = os.path.join(CLEAN_OUTPUT_DIR, "main_tiktok_data_clean.parquet")
-            if os.path.exists(main_videos_path):
-                data["videos"] = pd.read_parquet(main_videos_path)
+            ultimate_path = os.path.join(CLEAN_OUTPUT_DIR, "ultimate_temporal_dataset.parquet")
+            if os.path.exists(ultimate_path):
+                data["videos"] = pd.read_parquet(ultimate_path)
             else:
-                data["videos"] = pd.read_csv(os.path.join(CLEAN_OUTPUT_DIR, "main_tiktok_data_clean.csv"))
-                logger.info(f"Loaded MAIN CORE videos data: {len(data['videos'])} rows with comprehensive info")
+                data["videos"] = pd.read_csv(os.path.join(CLEAN_OUTPUT_DIR, "ultimate_temporal_dataset.csv"))
+                logger.info(f"Loaded ULTIMATE TEMPORAL dataset: {len(data['videos'])} rows with comprehensive temporal data")
         except Exception as e:
-            logger.error(f"Error loading main core videos data: {str(e)}")
+            logger.error(f"Error loading ultimate temporal dataset: {str(e)}")
             try:
-                data["videos"] = pd.read_csv(os.path.join(OUTPUT_DIR, "final_tiktok_data_cleaned_v2.csv"))
-                logger.info("Loaded videos data from original main core file")
+                # Fallback to main core
+                data["videos"] = pd.read_csv(os.path.join(CLEAN_OUTPUT_DIR, "main_tiktok_data_clean.csv"))
+                logger.info("Loaded main core as fallback")
             except Exception as e2:
-                logger.error(f"Error loading fallback main core data: {str(e2)}")
+                logger.error(f"Error loading fallback data: {str(e2)}")
                 data["videos"] = pd.DataFrame()
         
         # Load additional dates data for temporal analysis
@@ -399,12 +400,12 @@ def analyze_word_usage_by_date(data: Dict[str, Any], word: str) -> Dict[str, Any
                 "message": f"No se encontraron videos que contengan la palabra '{word}' o sus derivadas"
             }
         
-        # Process dates
+        # Process dates - prioritize 'date' column from temporal dataset
         date_column = None
-        if "upload_date" in matching_videos.columns:
-            date_column = "upload_date"
-        elif "date" in matching_videos.columns:
+        if "date" in matching_videos.columns:
             date_column = "date"
+        elif "upload_date" in matching_videos.columns:
+            date_column = "upload_date"
         
         if date_column is None:
             return {

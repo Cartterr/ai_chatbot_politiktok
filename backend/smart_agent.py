@@ -26,9 +26,10 @@ class SmartDataAgent:
         """Load and catalog all available datasets"""
         print("🤖 Smart Agent initializing...")
         
-        # Priority order for datasets (most comprehensive first) - CORRECTED
+        # Priority order for datasets (most comprehensive first) - ULTIMATE VERSION
         dataset_priorities = [
-            "main_tiktok_data_clean.csv",  # MAIN CORE - most comprehensive
+            "ultimate_temporal_dataset.csv",  # ULTIMATE - combines all sources with temporal data
+            "main_tiktok_data_clean.csv",  # MAIN CORE - comprehensive user data
             "combined_tiktok_data_with_dates_clean.csv",  # DATES for temporal analysis
             "subtitles_clean.csv"  # SUBTITLES for additional content
         ]
