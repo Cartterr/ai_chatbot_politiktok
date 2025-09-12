@@ -235,7 +235,7 @@ def determine_relevant_datasets(query: str, data: Dict[str, Any]) -> Dict[str, f
     query_lower = query.lower()
     relevance_scores = {}
     
-    # Keywords that indicate which datasets might be relevant
+    # Keywords that indicate which datasets might be relevant - ENHANCED FOR TEMPORAL QUERIES
     dataset_keywords = {
         "accounts": [
             "cuenta", "creador", "usuario", "perfil", "seguidor", "influencer", 
@@ -245,7 +245,13 @@ def determine_relevant_datasets(query: str, data: Dict[str, Any]) -> Dict[str, f
         "videos": [
             "video", "contenido", "publicación", "post", "views", "visualización",
             "fecha", "tiempo", "temporal", "evolución", "tendencia", "viral",
-            "content", "publication", "date", "time", "trend", "evolution"
+            "content", "publication", "date", "time", "trend", "evolution",
+            # ENHANCED: Add political and user type keywords for better relevance
+            "izquierda", "derecha", "político", "política", "perspectiva", "usuarios",
+            "creadores", "género", "sexualidades", "actividad", "activos", "más",
+            "cuándo", "cuando", "días", "día", "mes", "año", "periodo", "picos",
+            "left", "right", "political", "users", "creators", "gender", "sexuality",
+            "activity", "active", "when", "days", "month", "year", "period", "peaks"
         ],
         "subtitles": [
             "subtítulo", "transcripción", "texto", "habla", "dice", "menciona",
@@ -267,8 +273,13 @@ def determine_relevant_datasets(query: str, data: Dict[str, Any]) -> Dict[str, f
                 if keyword in query_lower:
                     score += 1
             
-            # Normalize score (0-1 range)
-            relevance_scores[dataset_name] = min(score / len(keywords), 1.0)
+            # BOOST: Give higher relevance to videos dataset for temporal queries
+            if dataset_name == "videos" and any(temporal_word in query_lower for temporal_word in 
+                ["cuándo", "cuando", "fecha", "fechas", "día", "días", "mes", "año", "tiempo", "temporal", "actividad", "activos", "más"]):
+                score *= 3  # Triple the score for temporal queries
+            
+            # Normalize score (0-1 range) but allow higher scores for boosted datasets
+            relevance_scores[dataset_name] = min(score / len(keywords), 2.0 if dataset_name == "videos" else 1.0)
     
     # If no specific keywords found, include all datasets with lower relevance
     if not any(score > 0 for score in relevance_scores.values()):

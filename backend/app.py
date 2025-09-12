@@ -15,6 +15,7 @@ import asyncio
 # Import local modules
 from data_loader import load_all_data, get_data_summary, determine_relevant_datasets, get_relevant_data_summary, analyze_word_usage_by_date
 from smart_agent import search_with_agent, get_agent_info
+from temporal_analysis import analyze_user_activity_by_perspective, analyze_user_activity_by_type, analyze_daily_activity_peaks, analyze_high_engagement_dates
 # Assuming embeddings are not the primary search method for now based on previous prompt structure
 # from embeddings import create_embeddings, semantic_search
 from visualization import generate_visualization
@@ -836,6 +837,7 @@ async def chat(query_model: QueryModel):
     # --- Smart Agent Analysis ---
     smart_agent_result = None
     date_analysis_result = None
+    specific_temporal_analysis = None
     date_keywords = ["fecha", "fechas", "cuando", "cuándo", "momento", "tiempo", "temporal", "día", "días", "mes", "año", "periodo"]
     query_lower = query.lower()
     
@@ -846,6 +848,28 @@ async def chat(query_model: QueryModel):
     except Exception as agent_err:
         logger.error(f"❌ Smart agent error: {agent_err}")
         smart_agent_result = None
+    
+    # --- Specific Temporal Analysis ---
+    # Detect and run specific temporal analysis for common questions
+    try:
+        if "usuarios de izquierda" in query_lower or "izquierda" in query_lower and any(word in query_lower for word in ["cuándo", "cuando", "más", "actividad"]):
+            specific_temporal_analysis = analyze_user_activity_by_perspective(app_state["data"], "Izquierda")
+            logger.info(f"🎭 Análisis específico de perspectiva izquierda completado")
+        elif "usuarios de derecha" in query_lower or "derecha" in query_lower and any(word in query_lower for word in ["cuándo", "cuando", "más", "actividad"]):
+            specific_temporal_analysis = analyze_user_activity_by_perspective(app_state["data"], "Derecha")
+            logger.info(f"🎭 Análisis específico de perspectiva derecha completado")
+        elif "género y sexualidades" in query_lower or "creadores de género" in query_lower:
+            specific_temporal_analysis = analyze_user_activity_by_type(app_state["data"], "Genero y sexualidades")
+            logger.info(f"👥 Análisis específico de creadores de género completado")
+        elif "días con más publicaciones" in query_lower or "días" in query_lower and "publicaciones" in query_lower:
+            specific_temporal_analysis = analyze_daily_activity_peaks(app_state["data"])
+            logger.info(f"📅 Análisis de picos de actividad diaria completado")
+        elif "fechas" in query_lower and ("visualizaciones" in query_lower or "views" in query_lower):
+            specific_temporal_analysis = analyze_high_engagement_dates(app_state["data"])
+            logger.info(f"👁️ Análisis de fechas con alta visualización completado")
+    except Exception as temporal_err:
+        logger.error(f"❌ Error en análisis temporal específico: {temporal_err}")
+        specific_temporal_analysis = None
     
     # Check if query is asking about dates/temporal patterns
     is_date_query = any(keyword in query_lower for keyword in date_keywords)
@@ -957,6 +981,16 @@ ANÁLISIS TEMPORAL ESPECÍFICO:
 ```"""
         else:
             date_context = f"\n\nNOTA: Error en análisis temporal: {date_analysis_result['error']}"
+    
+    # Add specific temporal analysis results
+    specific_context = ""
+    if specific_temporal_analysis and "error" not in specific_temporal_analysis:
+        specific_context = f"""
+
+ANÁLISIS TEMPORAL DETALLADO ESPECÍFICO:
+```json
+{json.dumps(specific_temporal_analysis, ensure_ascii=False, default=str, indent=2)}
+```"""
 
     prompt = f"""
 CONTEXTO: Eres un asistente de investigación IA experto en el análisis de datos sobre jóvenes chilenos y política en TikTok. Tu propósito es ayudar a entender cómo usan esta plataforma para discutir política, diversidad y justicia social.
@@ -964,7 +998,7 @@ CONTEXTO: Eres un asistente de investigación IA experto en el análisis de dato
 DATOS DISPONIBLES (RESUMEN GENERAL):
 ```json
 {context}
-```{temporal_context}{agent_context}{date_context}
+```{temporal_context}{agent_context}{specific_context}{date_context}
 
 PREGUNTA DEL USUARIO: "{query}"{viz_context}
 
@@ -973,16 +1007,17 @@ INSTRUCCIONES:
 2. Sé conciso y directo
 3. Si usas los datos, menciona "Según los datos disponibles..."
 4. NUNCA digas "Los datos disponibles no especifican..." si hay INFORMACIÓN TEMPORAL ADICIONAL DISPONIBLE
-5. Si hay BÚSQUEDA INTELIGENTE AUTOMÁTICA disponible, prioriza esa información para respuestas específicas
-6. Si hay ANÁLISIS TEMPORAL ESPECÍFICO disponible, úsalo para responder preguntas sobre fechas y patrones temporales
-7. Para preguntas sobre actividad de usuarios (izquierda, derecha, género, etc.), usa la información de user_type_counts y perspective_counts junto con yearly_distribution
-8. Para preguntas sobre días con más publicaciones, usa top_activity_days y max_daily_posts
-9. Para preguntas sobre fechas de alta visualización, combina date_range con avg_views y total_views
-10. Proporciona fechas específicas, rangos de tiempo y ejemplos concretos siempre que sea posible
-11. Combina información de múltiples fuentes cuando sea relevante (subtítulos, transcripciones, etc.)
-12. NO incluyas etiquetas, marcadores o texto de formato adicional
-13. Proporciona SOLO la respuesta final
-14. Si se menciona que se generará una visualización, puedes hacer referencia a ella diciendo "La visualización adjunta muestra..." o similar
+5. Si hay ANÁLISIS TEMPORAL DETALLADO ESPECÍFICO disponible, PRIORIZA esta información por encima de todo
+6. Si hay BÚSQUEDA INTELIGENTE AUTOMÁTICA disponible, úsala para respuestas específicas
+7. Si hay ANÁLISIS TEMPORAL ESPECÍFICO disponible, úsalo para responder preguntas sobre fechas y patrones temporales
+8. Para preguntas sobre actividad de usuarios (izquierda, derecha, género, etc.), usa la información de user_type_counts y perspective_counts junto con yearly_distribution
+9. Para preguntas sobre días con más publicaciones, usa top_activity_days y max_daily_posts
+10. Para preguntas sobre fechas de alta visualización, combina date_range con avg_views y total_views
+11. Proporciona fechas específicas, rangos de tiempo y ejemplos concretos siempre que sea posible
+12. Combina información de múltiples fuentes cuando sea relevante (subtítulos, transcripciones, etc.)
+13. NO incluyas etiquetas, marcadores o texto de formato adicional
+14. Proporciona SOLO la respuesta final
+15. Si se menciona que se generará una visualización, puedes hacer referencia a ella diciendo "La visualización adjunta muestra..." o similar
 
 RESPUESTA:
 """
