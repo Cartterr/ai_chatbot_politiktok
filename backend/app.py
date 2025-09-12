@@ -922,7 +922,7 @@ async def chat(query_model: QueryModel):
         else:
             logger.info(f"   ⚡ SIN CAMBIOS: query mantenido como '{smart_query}'")
     
-    # Add smart agent and date analysis to context if available
+    # Add smart agent and enhanced temporal context
     agent_context = ""
     if smart_agent_result and smart_agent_result['summary']['total_matches'] > 0:
         agent_context = f"""
@@ -931,6 +931,20 @@ BÚSQUEDA INTELIGENTE AUTOMÁTICA:
 ```json
 {json.dumps(smart_agent_result, ensure_ascii=False, default=str, indent=2)}
 ```"""
+    
+    # Add enhanced temporal context for better date analysis
+    temporal_context = ""
+    if "videos" in app_state["data"] and not app_state["data"]["videos"].empty:
+        df = app_state["data"]["videos"]
+        if "date" in df.columns and "user_type" in df.columns and "perspective" in df.columns:
+            temporal_context = f"""
+
+INFORMACIÓN TEMPORAL ADICIONAL DISPONIBLE:
+- Dataset temporal completo con {len(df)} videos desde {df['date'].min()} hasta {df['date'].max()}
+- Tipos de usuario disponibles: {', '.join(df['user_type'].dropna().unique()[:5])}
+- Perspectivas políticas: {', '.join(df['perspective'].dropna().unique())}
+- Métricas de actividad diaria y patrones temporales disponibles
+- Análisis de engagement y visualizaciones por fechas disponible"""
     
     date_context = ""
     if date_analysis_result:
@@ -950,7 +964,7 @@ CONTEXTO: Eres un asistente de investigación IA experto en el análisis de dato
 DATOS DISPONIBLES (RESUMEN GENERAL):
 ```json
 {context}
-```{agent_context}{date_context}
+```{temporal_context}{agent_context}{date_context}
 
 PREGUNTA DEL USUARIO: "{query}"{viz_context}
 
@@ -958,14 +972,17 @@ INSTRUCCIONES:
 1. Responde ÚNICAMENTE en ESPAÑOL
 2. Sé conciso y directo
 3. Si usas los datos, menciona "Según los datos disponibles..."
-4. Si no hay datos relevantes, indica "Los datos disponibles no especifican..."
+4. NUNCA digas "Los datos disponibles no especifican..." si hay INFORMACIÓN TEMPORAL ADICIONAL DISPONIBLE
 5. Si hay BÚSQUEDA INTELIGENTE AUTOMÁTICA disponible, prioriza esa información para respuestas específicas
 6. Si hay ANÁLISIS TEMPORAL ESPECÍFICO disponible, úsalo para responder preguntas sobre fechas y patrones temporales
-7. Para preguntas temporales, proporciona fechas específicas, rangos de tiempo y ejemplos concretos
-8. Combina información de múltiples fuentes cuando sea relevante (subtítulos, transcripciones, etc.)
-9. NO incluyas etiquetas, marcadores o texto de formato adicional
-10. Proporciona SOLO la respuesta final
-11. Si se menciona que se generará una visualización, puedes hacer referencia a ella diciendo "La visualización adjunta muestra..." o similar
+7. Para preguntas sobre actividad de usuarios (izquierda, derecha, género, etc.), usa la información de user_type_counts y perspective_counts junto con yearly_distribution
+8. Para preguntas sobre días con más publicaciones, usa top_activity_days y max_daily_posts
+9. Para preguntas sobre fechas de alta visualización, combina date_range con avg_views y total_views
+10. Proporciona fechas específicas, rangos de tiempo y ejemplos concretos siempre que sea posible
+11. Combina información de múltiples fuentes cuando sea relevante (subtítulos, transcripciones, etc.)
+12. NO incluyas etiquetas, marcadores o texto de formato adicional
+13. Proporciona SOLO la respuesta final
+14. Si se menciona que se generará una visualización, puedes hacer referencia a ella diciendo "La visualización adjunta muestra..." o similar
 
 RESPUESTA:
 """

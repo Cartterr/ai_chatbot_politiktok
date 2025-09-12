@@ -291,9 +291,9 @@ def get_relevant_data_summary(data: Dict[str, Any], relevant_datasets: Dict[str,
             "contains": "Datos de perfiles, seguidores, perspectivas políticas"
         },
         "videos": {
-            "filename": "combined_tiktok_data_cleaned_with_date.csv",
-            "description": "Datos de videos de TikTok con fechas",
-            "contains": "Información de videos, visualizaciones, fechas de publicación"
+            "filename": "ultimate_temporal_dataset.csv",
+            "description": "Dataset temporal completo con información de usuarios, perspectivas políticas y fechas",
+            "contains": "Videos con fechas, tipos de usuario, perspectivas políticas, actividad temporal, engagement"
         },
         "subtitles": {
             "filename": "subtitulos_videos_v3.csv",
@@ -326,9 +326,45 @@ def get_relevant_data_summary(data: Dict[str, Any], relevant_datasets: Dict[str,
             # Add specific statistics
             if dataset_name == "accounts" and "perspective" in df.columns:
                 data_summary[dataset_name]["perspective_counts"] = df["perspective"].value_counts().to_dict()
-            elif dataset_name == "videos" and "views" in df.columns:
-                data_summary[dataset_name]["avg_views"] = float(df["views"].mean())
-                data_summary[dataset_name]["total_views"] = float(df["views"].sum())
+            elif dataset_name == "videos":
+                # Enhanced temporal statistics for videos dataset
+                if "views" in df.columns:
+                    data_summary[dataset_name]["avg_views"] = float(df["views"].mean())
+                    data_summary[dataset_name]["total_views"] = float(df["views"].sum())
+                
+                # Add temporal information
+                if "date" in df.columns:
+                    df_temp = df.copy()
+                    df_temp["date"] = pd.to_datetime(df_temp["date"], errors='coerce')
+                    data_summary[dataset_name]["date_range"] = {
+                        "earliest": str(df_temp["date"].min()),
+                        "latest": str(df_temp["date"].max()),
+                        "total_with_dates": int(df_temp["date"].notna().sum())
+                    }
+                    
+                    # Add yearly distribution
+                    if df_temp["date"].notna().any():
+                        yearly_counts = df_temp["date"].dt.year.value_counts().sort_index()
+                        data_summary[dataset_name]["yearly_distribution"] = yearly_counts.to_dict()
+                
+                # Add user type and perspective information
+                if "user_type" in df.columns:
+                    user_type_counts = df["user_type"].value_counts()
+                    data_summary[dataset_name]["user_type_counts"] = user_type_counts.to_dict()
+                
+                if "perspective" in df.columns:
+                    perspective_counts = df["perspective"].value_counts()
+                    data_summary[dataset_name]["perspective_counts"] = perspective_counts.to_dict()
+                
+                # Add activity metrics
+                if "daily_post_count" in df.columns:
+                    data_summary[dataset_name]["max_daily_posts"] = int(df["daily_post_count"].max())
+                    top_days = df.nlargest(3, "daily_post_count")[["date", "daily_post_count"]].drop_duplicates()
+                    data_summary[dataset_name]["top_activity_days"] = [
+                        {"date": str(row["date"]), "posts": int(row["daily_post_count"])} 
+                        for _, row in top_days.iterrows()
+                    ]
+                    
             elif dataset_name == "words" and "sentimiento" in df.columns:
                 sentiment_counts = df["sentimiento"].value_counts().to_dict()
                 data_summary[dataset_name]["sentiment_counts"] = {str(k): v for k, v in sentiment_counts.items()}
