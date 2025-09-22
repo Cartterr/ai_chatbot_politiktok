@@ -69,7 +69,7 @@ const DataSourcesDisplay = ({ dataSources, queryAnalysis }) => {
               ×
             </button>
           </div>
-          
+
           <div className="p-4 overflow-auto flex-1">
             <div className="mb-4">
               <h4 className="font-medium text-gray-900 mb-2">Columnas:</h4>
@@ -81,7 +81,7 @@ const DataSourcesDisplay = ({ dataSources, queryAnalysis }) => {
                 ))}
               </div>
             </div>
-            
+
             <div>
               <h4 className="font-medium text-gray-900 mb-2">Datos (primeras 100 filas):</h4>
               <div className="overflow-x-auto">
@@ -130,7 +130,7 @@ const DataSourcesDisplay = ({ dataSources, queryAnalysis }) => {
             Ver fuentes de datos relevantes ({dataSources.length})
           </span>
         </summary>
-        
+
         <div className="mt-3 space-y-3">
           {queryAnalysis && (
             <div className="p-3 bg-blue-50 rounded-lg text-xs text-blue-800 border border-blue-200">
@@ -141,7 +141,7 @@ const DataSourcesDisplay = ({ dataSources, queryAnalysis }) => {
               <p>{queryAnalysis}</p>
             </div>
           )}
-          
+
           {dataSources.map((source, index) => (
             <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
               <div className="p-3 bg-gray-50">
@@ -161,17 +161,17 @@ const DataSourcesDisplay = ({ dataSources, queryAnalysis }) => {
                     <span>{loading && viewingDataset === source.dataset ? 'Cargando...' : 'Ver datos'}</span>
                   </button>
                 </div>
-                
+
                 <p className="text-xs text-gray-600 mb-2">{source.description}</p>
                 <p className="text-xs text-gray-500">{source.contains}</p>
-                
+
                 <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
                   <span>{source.rows.toLocaleString()} filas</span>
                   <span>{source.columns} columnas</span>
                   <span>Relevancia: {(source.relevance_score * 100).toFixed(0)}%</span>
                 </div>
               </div>
-              
+
               <button
                 onClick={() => setExpandedSource(expandedSource === index ? null : index)}
                 className="w-full px-3 py-2 text-left text-xs text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-between"
@@ -179,7 +179,7 @@ const DataSourcesDisplay = ({ dataSources, queryAnalysis }) => {
                 <span>Detalles técnicos</span>
                 <FaChevronRight className={`text-xs transform transition-transform ${expandedSource === index ? 'rotate-90' : ''}`} />
               </button>
-              
+
               {expandedSource === index && (
                 <div className="px-3 pb-3 bg-gray-50 border-t border-gray-200">
                   <div className="text-xs text-gray-600 space-y-1">
@@ -190,7 +190,7 @@ const DataSourcesDisplay = ({ dataSources, queryAnalysis }) => {
               )}
             </div>
           ))}
-          
+
           {error && (
             <div className="p-3 bg-red-50 text-red-800 rounded-lg text-xs border border-red-200">
               <p>{error}</p>

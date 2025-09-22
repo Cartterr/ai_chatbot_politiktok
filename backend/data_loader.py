@@ -37,20 +37,27 @@ def load_all_data() -> Dict[str, Any]:
             logger.error(f"Error loading accounts data: {str(e)}")
             data["accounts"] = pd.DataFrame()
         
-        # Load ULTIMATE TEMPORAL dataset - combines all data sources with dates
+        # Load PRIMARY CLEANED dataset - main comprehensive dataset
         try:
-            ultimate_path = os.path.join(CLEAN_OUTPUT_DIR, "ultimate_temporal_dataset.parquet")
-            if os.path.exists(ultimate_path):
-                data["videos"] = pd.read_parquet(ultimate_path)
+            primary_path = os.path.join(CLEAN_OUTPUT_DIR, "final_tiktok_data_cleaned_v6.csv")
+            if os.path.exists(primary_path):
+                data["videos"] = pd.read_csv(primary_path, low_memory=False)
+                logger.info(f"Loaded PRIMARY CLEANED dataset: {len(data['videos'])} rows with comprehensive data")
             else:
-                data["videos"] = pd.read_csv(os.path.join(CLEAN_OUTPUT_DIR, "ultimate_temporal_dataset.csv"))
-                logger.info(f"Loaded ULTIMATE TEMPORAL dataset: {len(data['videos'])} rows with comprehensive temporal data")
+                # Fallback to ultimate temporal
+                ultimate_path = os.path.join(CLEAN_OUTPUT_DIR, "ultimate_temporal_dataset.csv")
+                if os.path.exists(ultimate_path):
+                    data["videos"] = pd.read_csv(ultimate_path)
+                    logger.info("Loaded ultimate temporal as fallback")
+                else:
+                    data["videos"] = pd.read_csv(os.path.join(CLEAN_OUTPUT_DIR, "main_tiktok_data_clean.csv"))
+                    logger.info("Loaded main core as fallback")
         except Exception as e:
-            logger.error(f"Error loading ultimate temporal dataset: {str(e)}")
+            logger.error(f"Error loading primary cleaned dataset: {str(e)}")
             try:
-                # Fallback to main core
-                data["videos"] = pd.read_csv(os.path.join(CLEAN_OUTPUT_DIR, "main_tiktok_data_clean.csv"))
-                logger.info("Loaded main core as fallback")
+                # Fallback to ultimate temporal
+                data["videos"] = pd.read_csv(os.path.join(CLEAN_OUTPUT_DIR, "ultimate_temporal_dataset.csv"))
+                logger.info("Loaded ultimate temporal as fallback")
             except Exception as e2:
                 logger.error(f"Error loading fallback data: {str(e2)}")
                 data["videos"] = pd.DataFrame()
@@ -114,8 +121,11 @@ def process_data(data: Dict[str, Any]) -> None:
     
     # Process videos data
     if "videos" in data and not data["videos"].empty:
-        # Convert date to datetime
-        if "date" in data["videos"].columns:
+        # Convert upload_date to datetime (updated column name for v6)
+        if "upload_date" in data["videos"].columns:
+            data["videos"]["upload_date"] = pd.to_datetime(data["videos"]["upload_date"], errors="coerce")
+            data["videos"]["date"] = data["videos"]["upload_date"]  # Create alias for compatibility
+        elif "date" in data["videos"].columns:
             data["videos"]["date"] = pd.to_datetime(data["videos"]["date"], errors="coerce")
         
         # Convert views to numeric
@@ -302,9 +312,9 @@ def get_relevant_data_summary(data: Dict[str, Any], relevant_datasets: Dict[str,
             "contains": "Datos de perfiles, seguidores, perspectivas políticas"
         },
         "videos": {
-            "filename": "ultimate_temporal_dataset.csv",
-            "description": "Dataset temporal completo con información de usuarios, perspectivas políticas y fechas",
-            "contains": "Videos con fechas, tipos de usuario, perspectivas políticas, actividad temporal, engagement"
+            "filename": "final_tiktok_data_cleaned_v6.csv",
+            "description": "Dataset principal limpio con información completa de TikTok",
+            "contains": "Videos con datos completos: usuarios, perspectivas políticas, engagement, análisis afectivo, transcripciones"
         },
         "subtitles": {
             "filename": "subtitulos_videos_v3.csv",

@@ -26,8 +26,9 @@ class SmartDataAgent:
         """Load and catalog all available datasets"""
         print("🤖 Smart Agent initializing...")
         
-        # Priority order for datasets (most comprehensive first) - ULTIMATE VERSION
+        # Priority order for datasets (most comprehensive first) - UPDATED VERSION
         dataset_priorities = [
+            "final_tiktok_data_cleaned_v6.csv",  # PRIMARY - main cleaned dataset with comprehensive data
             "ultimate_temporal_dataset.csv",  # ULTIMATE - combines all sources with temporal data
             "main_tiktok_data_clean.csv",  # MAIN CORE - comprehensive user data
             "combined_tiktok_data_with_dates_clean.csv",  # DATES for temporal analysis
@@ -296,8 +297,12 @@ class SmartDataAgent:
         
         for match in best_matches:
             if match["total_matches"] > 0:
-                dataset_name = match["dataset"].replace("_clean.csv", "").replace("final_tiktok_data_", "")
-                recommendations.append(f"Dataset '{dataset_name}' tiene {match['total_matches']} coincidencias")
+                dataset_name = match["dataset"]
+                if dataset_name == "final_tiktok_data_cleaned_v6.csv":
+                    display_name = "final_tiktok_data_cleaned_v6.csv (dataset principal)"
+                else:
+                    display_name = dataset_name.replace("_clean.csv", "").replace("final_tiktok_data_", "")
+                recommendations.append(f"Dataset '{display_name}' tiene {match['total_matches']} coincidencias")
                 
                 if match["temporal_analysis"]:
                     temp = match["temporal_analysis"]
